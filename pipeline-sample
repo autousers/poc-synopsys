@@ -1,0 +1,43 @@
+pipeline {
+    agent none
+    stages {
+        stage('Source Code Scan') {
+            agent {
+                node {
+                    label 'Coverity-slave'
+                }
+            }
+            environment {
+                COV_PATH = 'D:\\coverity\\bin\\'
+            }
+            steps {
+                withCoverityEnvironment(coverityInstanceUrl: 'http://localhost:8080', projectName: 'test', streamName: 'test', viewName: 'Outstanding Issues', createMissingProjectsAndStreams: true) {
+                    bat "echo ${COV_STREAM}"
+                    bat "${COV_PATH}cov-build --dir idir msbuild xxx.sln /t:rebuild"
+                    bat "${COV_PATH}cov-analyze --dir idir --all --distrust-all --webapp-security --security --strip-path ${WORKSPACE}"
+                    bat "${COV_PATH}cov-commit-defects --dir idir --url ${COV_URL} --stream ${COV_STREAM} --auth-key-file ${COV_AUTH_KEY_PATH}"
+                    coverityIssueCheck coverityInstanceUrl: 'http://localhost:8080', credentialsId: 'e12a33', projectName: 'test', viewName:'Outstanding Issues'
+                }
+            }
+        }
+        stage('Black Duck Scan') {
+            agent {
+                node {
+                    label 'Coverity-slave'
+                }
+            }
+            steps {
+                echo 'Black Duck Scan'
+                echo '***************************'
+                synopsys_detect detectProperties: '''--blackduck.url=https://localhost
+                --blackduck.api.token="dfsdfsdf"
+                --blackduck.trust.cert=true
+                --detect.project.name=test
+                --detect.project.version.name=1.0
+                --detect.policy.check.fail.on.severities=BLOCKER,CRITICAL,MAJOR,MINOR
+                --detect.source.path=D:\temp\
+                ''', downloadStrategyOverride: [$class: 'ScriptOrJarDownloadStrategy']
+            }
+        }
+    }
+}
