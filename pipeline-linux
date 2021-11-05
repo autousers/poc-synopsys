@@ -1,0 +1,47 @@
+pipeline {
+    agent none
+    stages {
+        stage('Source Code Scan') {
+            agent {
+                node {
+                    label 'Coverity-slave'
+                }
+            }
+            environment {
+                COV_PATH = 'home/ubutu/coverity/bin'
+            }
+            steps {
+                withCoverityEnvironment(coverityInstanceUrl: 'http://localhost:8080', projectName: 'test', streamName: 'test', viewName: 'Outstanding Issues', createMissingProjectsAndStreams: true) {
+                    sh """
+                    echo ${COV_STREAM}
+                    cd /home/ubuntu/sourcecode
+                    $COV_PATH/cov-build --dir idir msbuild xxx.sln /t:rebuild
+                    $COV_PATH/cov-analyze --dir idir --all --distrust-all --webapp-security --security --strip-path .
+                    $COV_PATH/cov-commit-defects --dir idir --url $COV_URL --stream $COV_STREAM --auth-key-file $COV_AUTH_KEY_PATH
+                    """
+                    coverityIssueCheck coverityInstanceUrl: 'http://localhost:8080', credentialsId: 'e12a33', projectName: 'test', viewName:'Outstanding Issues'
+                }
+            }
+        }
+        stage('Black Duck Scan') {
+            agent {
+                node {
+                    label 'Coverity-slave'
+                }
+            }
+            steps {
+                echo 'Black Duck Scan'
+                echo '***************************'
+                sh """
+                cd /home/ubuntu/sourcecode
+                bash <(curl -s -L https://detect.synopsys.com/detect7.sh) \
+                --blackduck.url=https://blackduck.mydomain.com \
+                --blackduck.api.token=myaccesstoken \
+                --blackduck.trust.cert=true \
+                --detect.project.name=dvwa-php \
+                --detect.project.version.name=1.0
+                """
+            }
+        }
+    }
+}
