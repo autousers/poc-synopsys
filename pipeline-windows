@@ -11,7 +11,7 @@ pipeline {
                 COV_PATH = 'D:\\coverity\\bin'
             }
             steps {
-                withCoverityEnvironment(coverityInstanceUrl: 'http://localhost:8080', projectName: 'test', streamName: 'test', viewName: 'Outstanding Issues', createMissingProjectsAndStreams: true) {
+                withCoverityEnvironment(coverityInstanceUrl: 'http://localhost:8080', projectName: 'test', streamName: 'test', viewName: 'Quality Gate', createMissingProjectsAndStreams: true) {
                     powershell """
                     echo ${COV_STREAM}
                     cd D:\\sourcecode
@@ -19,7 +19,12 @@ pipeline {
                     $COV_PATH\\cov-analyze --dir idir --all --distrust-all --webapp-security --security --strip-path .
                     $COV_PATH\\cov-commit-defects --dir idir --url $COV_URL --stream $COV_STREAM --auth-key-file $COV_AUTH_KEY_PATH
                     """
-                    coverityIssueCheck coverityInstanceUrl: 'http://localhost:8080', credentialsId: 'e12a33', projectName: 'test', viewName:'Outstanding Issues'
+                    script {
+                        def num_issues = coverityIssueCheck coverityInstanceUrl: 'http://localhost:8080', projectName: 'test', returnIssueCount: true, viewName: 'Quality Gate'
+                        if (num_issues > 5 ) {
+                            currentBuild.result = 'FAILURE'
+                        }
+                    }
                 }
             }
         }
